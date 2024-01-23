@@ -12,7 +12,7 @@
         -1.123391,        0.715832,        -1.896968
       ],
       "symbols" : [
-        "SI",        "SI",        "O",        "H",        "H",
+        "Si",        "Si",        "O",        "H",        "H",
         "H",        "H",        "H",        "H"
       ],
       "fragment_formal_charges": [0]
@@ -29,7 +29,7 @@
       "max_diis_history_length":10,
       "convergence_threshold":1E-6,
       "density_threshold":1E-10,
-      "convergence_metric":"Diis"
+      "convergence_metric":"DIIS"
     }
   },
   "system": {

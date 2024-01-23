@@ -28,7 +28,7 @@
       "max_diis_history_length":10,
       "convergence_threshold":1E-6,
       "density_threshold":1E-10,
-      "convergence_metric":"Diis"
+      "convergence_metric":"DIIS"
     }
   },
   "system": {
