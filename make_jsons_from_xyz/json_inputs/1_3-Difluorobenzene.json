@@ -1,0 +1,42 @@
+{
+  "topologies": [{
+      "geometry" : [
+        2.355361,        1.339218,        0.0,
+        -2.355361,        1.339218,        0.0,
+        1.203663,        -0.715897,        0.0,
+        -1.203663,        -0.715897,        0.0,
+        1.203694,        0.674096,        0.0,
+        -1.203694,        0.674096,        0.0,
+        0.0,        1.369129,        0.0,
+        0.0,        -1.411008,        0.0,
+        2.139107,        -1.255506,        0.0,
+        -2.139107,        -1.255506,        0.0,
+        0.0,        2.449058,        0.0,
+        0.0,        -2.491,        0.0
+      ],
+      "symbols" : [
+        "F",        "F",        "C",        "C",        "C",
+        "C",        "C",        "C",        "H",        "H",
+        "H",        "H"
+      ],
+      "fragment_formal_charges": [0]
+  }],
+  "driver": "Energy",
+  "model": {
+    "method": "RestrictedHF",
+    "basis": "cc-pVDZ",
+    "aux_basis": "cc-pVDZ"
+  },
+  "keywords": {
+    "scf": {
+      "max_iters":50,
+      "max_diis_history_length":10,
+      "convergence_threshold":1E-6,
+      "density_threshold":1E-10,
+      "convergence_metric":"Diis"
+    }
+  },
+  "system": {
+  "max_gpu_memory_mb": 1000 
+  }
+}
