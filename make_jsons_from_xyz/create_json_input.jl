@@ -36,7 +36,7 @@ function create_input_rhf(input, basis)
   output = open("$jsonout.json", "w") do file
     write(file, "{\n")
     #== write in molecule information ==#
-    write(file, "  \"topologies\": [{\n")
+    write(file, "  \"topology\": {\n")
     #== write each fragment's molecule information ==#
     #write(file, "    \"", input, "\": {\n")
 
@@ -72,14 +72,14 @@ function create_input_rhf(input, basis)
     end
     write(file, "      ],\n")
     #== write fragment charge ==#
-    write(file, "      \"fragment_formal_charges\": [$charge]\n")
+    write(file, "      \"fragment_charges\": [$charge]\n")
     #write(file, "    },\n")
-    write(file, "  }],\n")
+    write(file, "  },\n")
 
     #== write calculation driver and model information ==#
-    write(file, "  \"driver\": \"Energy\",\n")
+    write(file, "  \"driver\": \"geo_opt\",\n")
     write(file, "  \"model\": {\n")
-    write(file, "    \"method\": \"RestrictedHF\",\n")
+    write(file, "    \"method\": \"HF\",\n")
     write(file, "    \"basis\": \"$basis\",\n")
     write(file, "    \"aux_basis\": \"$basis\"\n")
     write(file, "  },\n")
@@ -87,12 +87,21 @@ function create_input_rhf(input, basis)
     #== write keywords ==#
     write(file, "  \"keywords\": {\n")
     write(file, "    \"scf\": {\n")
-    write(file, "      \"max_iters\":50,\n")
-    write(file, "      \"max_diis_history_length\":10,\n")
-    write(file, "      \"convergence_threshold\":1E-6,\n")
+    write(file, "      \"niter\":50,\n")
+    #write(file, "      \"max_diis_history_length\":10,\n")
+    write(file, "      \"scf_conv\":1E-6,\n")
     write(file, "      \"density_threshold\":1E-10,\n")
-    write(file, "      \"convergence_metric\":\"Diis\"\n")
-    write(file, "    }\n")
+    write(file, "      \"convergence_metric\":\"diis\"\n")
+    write(file, "    },\n")
+    write(file, " \"export\": {\n")
+    write(file, "  \"matrices_to_export\": [\"gradient\", \"coordinate_hessian\", \"bond_orders\"]\n")
+    write(file," },\n")
+    write(file, " \"geo_opt\": {\n")
+    write(file, "  \"max_iterations\": 80,\n")
+    write(file, "  \"conv_threshold\": 1e-4,\n")
+    write(file, "  \"use_internal_coordinates\": true,\n")
+    write(file, "  \"algorithm\": \"trust_radius_qn\"\n")
+    write(file," } \n")
     write(file, "  },\n")
     write(file, "  \"system\": {\n")
     write(file, "  \"max_gpu_memory_mb\": 1000 \n")
@@ -101,8 +110,8 @@ function create_input_rhf(input, basis)
   end
 end
 
-input_directory = "/home/jorgegv/work/scripts_jorge/get_xyz_from_quick/xyz_files"
-output_directory = "/home/jorgegv/work/scripts_jorge/make_jsons_from_xyz/json_inputs"
+input_directory = "/home/jorge/dev/jorge_useful_scripts/get_xyz_from_quick/xyz_files"
+output_directory = "/home/jorge/dev/jorge_useful_scripts/get_xyz_from_quick/xyz_files"
 
 # Loop through XYZ files
 for file in readdir(input_directory)
@@ -118,4 +127,3 @@ for file in readdir(input_directory)
         # write(output_path, "output_data_here")
     end
 end
-
