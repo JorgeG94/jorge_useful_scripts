@@ -101,6 +101,7 @@ function create_input_rhf(input, basis)
   end
 end
 
+#==
 input_directory = "/home/jorgegv/work/scripts_jorge/get_xyz_from_quick/xyz_files"
 output_directory = "/home/jorgegv/work/scripts_jorge/make_jsons_from_xyz/json_inputs"
 
@@ -118,4 +119,4 @@ for file in readdir(input_directory)
         # write(output_path, "output_data_here")
     end
 end
-
+==#
