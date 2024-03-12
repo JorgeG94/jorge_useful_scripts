@@ -1,0 +1,32 @@
+30
+
+C -0.266920 0.982587 0.304347
+C 0.958525 1.486860 -0.234834
+C 1.674979 0.853565 -1.227722
+O -0.946884 1.523244 1.171556
+O -0.652187 -0.207173 -0.239437
+C -1.899765 -0.744597 0.190817
+C -3.068817 -0.144552 -0.567778
+C -4.386775 -0.766225 -0.123942
+H 2.474569 1.389891 -1.716344
+H 1.186133 0.104773 -1.830293
+H -1.833140 -1.815719 -0.000593
+H -2.018053 -0.586399 1.262784
+H -3.080993 0.933044 -0.398857
+H -2.914666 -0.306088 -1.636544
+H -4.384051 -1.845107 -0.287454
+H -5.226762 -0.346354 -0.675311
+H -4.561386 -0.590597 0.938570
+S 3.213322 -0.770619 -0.378778
+C 2.533041 -0.837045 1.288541
+H 1.827201 -0.004392 1.407101
+H 1.995898 -1.766452 1.475876
+H 3.311036 -0.727195 2.042830
+H 1.338017 2.378382 0.245161
+Created using ESIgen v0.0.5
+ESIgen is scientific software, funded by public research grants and published as:
+J Rodriguez-Guerra, P Gomez-Orellana, JD Marechal.
+J. Chem. Inf. Model., 2018, 58 (3), pp 561564.
+DOI: 10.1021/acs.jcim.7b00714.
+If you make use of ESIgen in scientific publications, please cite us in the main text! References only mentioned
+in SI documents are not indexed by citation engines.

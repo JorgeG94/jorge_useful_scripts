@@ -1,0 +1,11 @@
+labelling
+1_methylacrolein_conf2_min.xyz, 0 
+1_pentene-3-one_truncated_1.xyz,7 
+2_crotonaldehyde_conf2_min.xyz, 0 
+3_4-methyl-2-pentenal_1.xyz,2
+3_methylcrotonate_1.xyz, 0
+4-hexene-3-one_1.xyz, 4
+5_3-methyl-2-cyclopentene-1-one_1.xyz, 4
+6_2ethylacrolein_1.xyz, 3
+8_ethylmethacrylate_1.xyz, 3
+n-propylacrylate_1.xyz, 2
