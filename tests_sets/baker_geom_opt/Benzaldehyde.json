@@ -1,0 +1,52 @@
+{
+  "topology": {
+      "geometry" : [
+        3.236956,        0.0,        0.0,
+        -0.226551,        -1.195695,        0.0,
+        -1.549798,        -0.759257,        0.0,
+        -1.833925,        0.603887,        0.0,
+        -0.797002,        1.533147,        0.0,
+        0.527135,        1.099905,        0.0,
+        0.82176,        -0.270063,        0.0,
+        2.280767,        -0.777731,        0.0,
+        2.483309,        -1.865001,        0.0,
+        -0.025606,        -2.258176,        0.0,
+        -2.355727,        -1.478663,        0.0,
+        -2.860291,        0.940922,        0.0,
+        -1.019479,        2.590301,        0.0,
+        1.318453,        1.836424,        0.0
+      ],
+      "symbols" : [
+        "O",        "C",        "C",        "C",        "C",
+        "C",        "C",        "C",        "H",        "H",
+        "H",        "H",        "H",        "H"
+      ],
+      "fragment_charges": [0]
+  },
+  "driver": "geo_opt",
+  "model": {
+    "method": "HF",
+    "basis": "cc-pVDZ",
+    "aux_basis": "cc-pVDZ"
+  },
+  "keywords": {
+    "scf": {
+      "niter":50,
+      "scf_conv":1E-6,
+      "density_threshold":1E-10,
+      "convergence_metric":"diis"
+    },
+ "export": {
+  "matrices_to_export": ["gradient", "coordinate_hessian", "bond_orders"]
+ },
+ "geo_opt": {
+  "max_iterations": 80,
+  "conv_threshold": 1e-4,
+  "use_internal_coordinates": true,
+  "algorithm": "trust_radius_qn"
+ } 
+  },
+  "system": {
+  "max_gpu_memory_mb": 1000 
+  }
+}
