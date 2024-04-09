@@ -1,11 +1,19 @@
 import json
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import sys
+import os
 
 def analyze_and_plot_nmers(file_path):
     # Read the JSON file
     with open(file_path, 'r') as file:
         data = json.load(file)
+
+    # Split the filename from its directory and extension
+    base_name = os.path.basename(file_path)  # Extracts the filename from a path
+    file_name_without_ext = os.path.splitext(base_name)[0]  # Removes the file extension
+
+
 
     # Extracting the reference fragment and initializing data structures
     reference_fragment = data["qmmbe"]["reference_fragment"]
@@ -43,26 +51,10 @@ def analyze_and_plot_nmers(file_path):
             E_I = monomer_energies.get(fragments[0], 0)
             E_J = monomer_energies.get(fragments[1], 0)
             deltaE_IJ = E_IJ - (E_I + E_J)
-            # distance = round(dimer["fragment_distance"], 16)
-            # if abs(deltaE_IJ) > less_small:
-            #     dimer_distances_deltaEs[distance].append(0.0)
-            # else:
-            #     dimer_distances_deltaEs[distance].append(deltaE_IJ)
-            #     dimer_results.append({"distance": distance, "deltaE": deltaE_IJ})
             dimer_distances_print[fragments] = dimer["fragment_distance"]
-            #if abs(deltaE_IJ) > less_small: 
-            #  dimer_deltaEs_print[fragments] = 0
-            #else:
+
             dimer_deltaEs_print[fragments] = deltaE_IJ
 
-    print(len(dimer_deltaEs_print))       
-                # # Average deltaE for trimers at each distance
-    # dimer_distances_plot = []
-    # dimer_avg_deltaEs_plot = []
-    # for distance, deltaEs in dimer_distances_deltaEs.items():
-    #     avg_deltaE = sum(deltaEs) / len(deltaEs)
-    #     dimer_distances_plot.append(distance)
-    #     dimer_avg_deltaEs_plot.append((small - avg_deltaE)*conversion_to_kj)
 
         
 
@@ -98,21 +90,11 @@ def analyze_and_plot_nmers(file_path):
                 E_K = monomer_energies.get(fragments[2], 0)
                 deltaE_IJK = E_IJK - sum(deltaE_components) - (E_I + E_J + E_K)
                 max_distance = round(min(distances) if distances else 0, 16)
-                #if abs(deltaE_IJK) > less_small:
-                #  trimer_distances_deltaEs[max_distance].append(0.0)
-                #else:
-                trimer_distances_deltaEs[max_distance].append(deltaE_IJK)
-                #max_distance = max(distances) if distances else 0
-                trimer_results.append({"distance": max_distance, "deltaE": deltaE_IJK})
-                #trimer_distances_deltaEs[max_distance].append(deltaE_IJK)
 
-        # # Average deltaE for trimers at each distance
-        # trimer_distances_plot = []
-        # trimer_avg_deltaEs_plot = []
-        # for distance, deltaEs in trimer_distances_deltaEs.items():
-        #     avg_deltaE = sum(deltaEs) / len(deltaEs)
-        #     trimer_distances_plot.append(distance)
-        #     trimer_avg_deltaEs_plot.append((small - avg_deltaE)*conversion_to_kj)
+                trimer_distances_deltaEs[max_distance].append(deltaE_IJK)
+
+                trimer_results.append({"distance": max_distance, "deltaE": deltaE_IJK})
+
 
 
         trimer_distances_plot = [result["distance"] for result in trimer_results]
@@ -129,8 +111,19 @@ def analyze_and_plot_nmers(file_path):
     plt.ylabel('\u0394E (kJ/mol)')
     plt.legend()
     plt.grid(True)
-    plt.savefig('nmers_plot.png', dpi=500)
+    # Construct the new plot filename
+    if trimers:
+        plot_file_name = f"{file_name_without_ext}_nmers_plot.png"
+    else:
+        plot_file_name = f"{file_name_without_ext}_dimers_plot.png"
 
-# Replace 'your_file_path_here' with the actual path to your 'nmers.json' file
-# Uncomment the line below to run the function and execute the final part
-analyze_and_plot_nmers('kk.json')
+    plt.savefig(plot_file_name, dpi=500)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python3 script.py <filename>")
+        sys.exit(1)
+
+    filename = sys.argv[1]
+    analyze_and_plot_nmers(filename)
