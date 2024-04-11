@@ -50,8 +50,11 @@ class Monomer:
             self.centroid[i] /= len(self.atoms)
 
 
-    def n_atoms(self):
-        return len(self.atoms)
+    def n_atoms(self, caps=False):
+        if caps:
+            return len(self.atoms) + len(self.broken_bonds)
+        else:
+            return len(self.atoms)
             
     def fingerprint(self):
         elements = {}
@@ -126,6 +129,12 @@ class Fragment:
 
     def monomer_ids(self):
         return sorted([mon.id for mon in self.monomers])
+
+    def n_atoms(self, caps=False):
+        n = sum([mon.n_atoms() for mon in self.monomers])
+        if caps:
+            n += len(self.h_caps)
+        return n
 
     def atoms(self):
         ret = []
@@ -291,3 +300,26 @@ class FragmentedSystem:
 
         return self.polymers[n][max_ix]
 
+def dinosaur():
+    print('''                                                     ___._       ''')
+    print('''                                                   .'  <0>'-.._''')
+    print('''                                                  /  /.--.____")''')
+    print('''                                                 |   \\   __.-'~''')
+    print('''                                                 |  :  -'/''')
+    print('''                                                /:.  :.-' ''')
+    print('''__________                                     | : '. |''')
+    print(''''--.____  '--------.______       _.----.-----./      :/''')
+    print('''        '--.__            `'----/       '-.      __ :/''')
+    print('''              '-.___           :           \\   .'  )/''')
+    print('''                    '---._           _.-'   ] /  _/''')
+    print('''                         '-._      _/     _/ / _/''')
+    print('''                             \\_ .-'____.-'__< |  \\___''')
+    print('''                               <_______.\\    \\_\\_---.7''')
+    print('''                              |   /'=r_.-'     _\\\\ =/''')
+    print('''                          .--'   /            ._/'>''')
+    print('''                        .'   _.-' ''')
+    print('''                       / .--' ''')
+    print('''                      /,/''')
+    print('''                      |/`)''')
+    print('''                      'c=,''')
+    print()
