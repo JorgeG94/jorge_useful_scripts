@@ -244,11 +244,14 @@ class Topology:
 
 class FragmentedSystem:
     def __init__(self, topology_json, cutoffs):
+        self.centroid = [0.0, 0.0, 0.0]
         self.topology = Topology()
         self.topology.from_json(topology_json)
 
         self.polymers = [None, self.topology.assemble_fragments()]
         monomers = self.polymers[1]
+
+        self.calculate_centroid()
 
         for (i, cutoff) in enumerate(cutoffs):
             n = i+2
@@ -285,7 +288,30 @@ class FragmentedSystem:
 
     def get_n_mer(self, monomers):
         return Fragment([self.polymers[1][i] for i in monomers])
+    
+    def get_reference_monomer(self):
+        monomer_distances = []
+        monomers = self.polymers[1]
+        for (i, monomer) in enumerate(monomers):
+            distance = cart(self.centroid, monomer.centroid)
+            monomer_distances.append([i, distance])
+            
+        sorted_monomer_distances = sorted(monomer_distances, key=lambda x: x[1])
+        return sorted_monomer_distances[0][0]
 
+    def calculate_centroid(self):        
+        atoms = self.topology.atoms
+        
+        for atom in atoms:
+            atom_coordinate = atom.coord
+            for i in range(3):
+                self.centroid[i] += atom_coordinate[i]
+        
+        natoms = len(atoms)
+
+        for i in range(3):
+            self.centroid[i] /= natoms
+    
     def n_mer_count(self, n):
         return len(self.polymers[n])
 
