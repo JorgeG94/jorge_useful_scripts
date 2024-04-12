@@ -25,6 +25,9 @@ cutoffs = [1000.0, 1000.0]
 system = FragmentedSystem(input_file, cutoffs)
 #system = FragmentedSystem(input_file['topologies'][0], cutoffs)
 
+ref_monomer = system.get_reference_monomer()
+print("Reference fragment: ", ref_monomer)
+
 # Form polymers by list of monomer ids
 tetramer = system.get_n_mer([0,1,2,3])
 tetramer.output_xyz('tetramer.xyz')
