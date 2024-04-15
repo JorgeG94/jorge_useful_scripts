@@ -1,6 +1,7 @@
 #!/bin/python3
 from pyscf import gto
 from itertools import combinations
+import sys
 
 ########################################################################################################
 ############################################# INFRASTRUCTURE ###########################################
@@ -38,17 +39,24 @@ class Monomer:
         self.id = ix
         self.atoms = []
         self.charge = charge
+        self.nelectrons = -1 * self.charge
         self.broken_bonds = broken_bonds
         self.centroid = [0.0,0.0,0.0]
         self.basis_cache = {}
         for atom in atoms:
             self.atoms.append(atom)
+            self.nelectrons += atom.a_no
             for i in range(3):
                 self.centroid[i] += atom.coord[i]
 
         for i in range(3):
             self.centroid[i] /= len(self.atoms)
-
+        
+        for i in range(len(broken_bonds)):
+            self.nelectrons += 1
+        
+        if (self.nelectrons % 2) != 0:
+            sys.stderr.write(f"WARNING: Fragment {ix} has odd no. of electrons ({self.nelectrons})\n")
 
     def n_atoms(self, caps=False):
         if caps:
@@ -289,15 +297,38 @@ class FragmentedSystem:
     def get_n_mer(self, monomers):
         return Fragment([self.polymers[1][i] for i in monomers])
     
-    def get_reference_monomer(self):
-        monomer_distances = []
+    def get_reference_monomer(self, type="centroid"):
+        '''
+            Two modes: 
+            1. centroid: selects fragment closest to system centroid.
+            2. ligand: selects largest fragment w no broken bonds.
+        '''
         monomers = self.polymers[1]
-        for (i, monomer) in enumerate(monomers):
-            distance = cart(self.centroid, monomer.centroid)
-            monomer_distances.append([i, distance])
+        if type == "centroid":
+            monomer_distances = []
+            for (i, monomer) in enumerate(monomers):
+                distance = cart(self.centroid, monomer.centroid)
+                monomer_distances.append([i, distance])
+                
+            sorted_monomer_distances = sorted(monomer_distances, key=lambda x: x[1])
+            return sorted_monomer_distances[0][0]
+        
+        elif type == "ligand":
+            print(type)
+            possible_ligands = []
+            for (i, monomer) in enumerate(monomers):
+                nbroken_bonds = len(monomer.broken_bonds)
+                if nbroken_bonds == 0:
+                    possible_ligands.append([i, monomer.n_atoms()])
             
-        sorted_monomer_distances = sorted(monomer_distances, key=lambda x: x[1])
-        return sorted_monomer_distances[0][0]
+            if not possible_ligands:
+                raise Exception("No ligand present in system.")
+            
+            sorted_possible_ligands = sorted(possible_ligands, key=lambda x: x[1], reverse=True)
+            return sorted_possible_ligands[0][0]
+        
+        else:
+            raise Exception("type: centroid OR ligand")
 
     def calculate_centroid(self):        
         atoms = self.topology.atoms
@@ -325,6 +356,9 @@ class FragmentedSystem:
                 max_ix = ix
 
         return self.polymers[n][max_ix]
+    
+    def nfrag(self):
+        return self.topology.nfrag()
 
 def dinosaur():
     print('''                                                     ___._       ''')
