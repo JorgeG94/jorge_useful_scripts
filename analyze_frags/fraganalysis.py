@@ -218,13 +218,48 @@ class Topology:
         for (i, (symbol, coord)) in enumerate(zip(symbols,coords)):
             self.atoms.append(Atom(coord, symbol_to_a_no[symbol], i))
 
-        if 'connectivity' in topology_json:
-            self.connectivity = topology_json['connectivity']
-        else:
-            self.connectivity = []
-
         self.fragments = topology_json['fragments']
         self.fragment_formal_charges = topology_json["fragment_formal_charges"]
+
+        if 'connectivity' in topology_json:
+            self.connectivity = topology_json['connectivity']
+
+            # check for unphysical bridging hydrogen scenario
+            # get the broken bonds first, which sometimes are a subset of connectivity
+            abort = False
+            atom_fragment_ids = [-1 for _ in range(len(symbols))]
+            for (ifrag, fragment) in enumerate(self.fragments):
+                for iatom in fragment:
+                    atom_fragment_ids[iatom] = ifrag
+            
+            broken_bonds = []
+            for bond in self.connectivity:
+                iatom = bond[0]
+                jatom = bond[1]
+
+                ifrag = atom_fragment_ids[iatom]
+                jfrag = atom_fragment_ids[jatom]
+
+                if (ifrag != jfrag):
+                    broken_bonds.append(tuple([iatom, jatom]))
+
+            atom_no_broken_bonds = [0 for _ in range(len(symbols))]
+            for bond in broken_bonds:
+                iatom = bond[0]
+                jatom = bond[1]
+
+                atom_no_broken_bonds[iatom] += 1
+                atom_no_broken_bonds[jatom] += 1
+            
+            for (iatom, no_broken_bonds) in enumerate(atom_no_broken_bonds):
+                if no_broken_bonds > 1:
+                    abort = True
+                    sys.stderr.write(f"WARNING: Atom {iatom} is involved in {no_broken_bonds} broken bonds.\n")
+            if abort:
+                raise Exception("Your input has adjacent broken bonds.")
+
+        else:
+            self.connectivity = []
 
         
     def to_json(self):
