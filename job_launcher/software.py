@@ -2,6 +2,28 @@ from queue import *
 import subprocess
 import os
 
+a_no_to_symbol = {1:"H", 2:"He", 3:"Li", 4:"Be", 5:"B", 6:"C", 7:"N", 8:"O",
+                  9:"F", 10:"Ne", 11:"Na", 12:"Mg", 13:"Al", 14:"Si", 15:"P",
+                  16:"S", 17:"Cl", 18:"Ar", 19:"K", 20:"Ca", 21:"Sc", 22:"Ti",
+                  23:"V", 24:"Cr", 25:"Mn", 26:"Fe", 27:"Co", 28:"Ni", 29:"Cu",
+                  30:"Zn", 31:"Ga", 32:"Ge", 33:"As", 34:"Se", 35:"Br",
+                  36:"Kr", 37:"Rb", 38:"Sr", 39:"Y", 40:"Zr", 41:"Nb", 42:"Mo",
+                  43:"Tc", 44:"Ru", 45:"Rh", 46:"Pd", 47:"Ag", 48:"Cd",
+                  49:"In", 50:"Sn", 51:"Sb", 52:"Te", 53:"I", 54:"Xe", 55:"Cs",
+                  56:"Ba", 57:"La", 58:"Ce", 59:"Pr", 60:"Nd", 61:"Pm",
+                  62:"Sm", 63:"Eu", 64:"Gd", 65:"Tb", 66:"Dy", 67:"Ho",
+                  68:"Er", 69:"Tm", 70:"Yb", 71:"Lu", 72:"Hf", 73:"Ta", 74:"W",
+                  75:"Re", 76:"Os", 77:"Ir", 78:"Pt", 79:"Au", 80:"Hg",
+                  81:"Tl", 82:"Pb", 83:"Bi", 84:"Po", 85:"At", 86:"Rn",
+                  87:"Fr", 88:"Ra", 89:"Ac", 90:"Th", 91:"Pa", 92:"U", 93:"Np",
+                  94:"Pu", 95:"Am", 96:"Cm", 97:"Bk", 98:"Cf", 99:"Es",
+                  100:"Fm", 101:"Md", 102:"No", 103:"Lr", 104:"Rf", 105:"Db",
+                  106:"Sg", 107:"Bh", 108:"Hs", 109:"Mt", 110:"Ds", 111:"Rg"}
+
+symbol_to_a_no = {}
+for a_no in a_no_to_symbol:
+    symbol_to_a_no[a_no_to_symbol[a_no]] = a_no
+
 class Atom:
     def __init__(self, symbol, coord):
         self.symbol = symbol
@@ -87,6 +109,35 @@ class Qchem:
         file += f'qchem -nt {resource_request.ncpus} {input_file}\n'
         return file
 
+class Gamess:
+    def __init__(self):
+        self.name = "gamess"
+
+    def create_input_file(self, geometry, resource_request):
+        file = ""
+        file += " $CONTRL SCFTYP=RHF RUNTYP=ENERGY MPLEVL=2 MAXIT=30 MULT=1 ISPHER=1 $END\n"
+        file += " $SYSTEM mwords=16000 memddi=1000 $END\n"
+        file += " $BASIS GBASIS=CCD $END\n"
+        file += " $SCF DIRSCF=.TRUE. $END\n"
+        file += "\n"
+        file += " $INTGRL INTOMP=1 $END\n"
+        file += " $mp2    NACORE=0 code=rimp2 $end\n"
+        file += " $rimp2  othaux=.f. ivmtd=2 gosmp=.f. usedm=.true. $end\n"
+        file += " $auxbas cabnam=ccd $end\n"
+        file += " $DATA\n"
+        file += "Title\n"
+        file += "C1\n"
+        for atom in geometry.atoms:
+            file += f"{atom.symbol} {symbol_to_a_no[atom.symbol]}.0    {atom.coord[0]}    {atom.coord[1]}    {atom.coord[2]}\n"
+        file += "$END\n"
+        return file
+
+    def create_run_script(self, resource_request, input_file):
+        file = ""
+        file += 'module load gamess\n'
+        file += f'rungms {input_file} 00 {resource_request.ncpus}\n'
+        return file
+
 
 class NWchem:
     def __init__(self):
@@ -149,7 +200,7 @@ def run_input(job_name, directory, job_system, resource_request, software, geome
 
     os.makedirs(directory, exist_ok=True)
 
-    input_filename = f"{job_name}.in"
+    input_filename = f"{job_name}.inp"
     job_filename = f"batch_{job_name}.sh"
 
     with open(f"{directory}/{input_filename}",'w') as input_file:

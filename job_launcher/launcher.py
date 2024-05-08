@@ -47,7 +47,7 @@ def main():
     else:
         raise Exception("Only PBS currently supported")
 
-    launch(args.name, args.i, [NWchem()], job_system, resources)
+    launch(args.name, args.i, [Orca(), Qchem(), Gamess()], job_system, resources)
 
     
 
