@@ -1,0 +1,89 @@
+{
+  "topologies": [
+    {
+      "xyz": "num_hess/unperturbed.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_0.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_0.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_1.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_1.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_2.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_2.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_3.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_3.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_4.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_4.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_5.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_5.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_6.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_6.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_7.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_7.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_pos_8.xyz"
+    },
+    {
+      "xyz": "num_hess/geom_neg_8.xyz"
+    }
+  ],
+  "model": {
+    "method": "RestrictedHF",
+    "basis": "STO-3G",
+    "aux_basis": "cc-pVTZ-RIFIT",
+    "standard_orientation": "None"
+  },
+  "keywords": {
+    "scf": {
+      "max_iters": 100,
+      "fock_build_type": "HGP",
+      "max_diis_history_length": 8,
+      "convergence_threshold": 1e-10,
+      "density_threshold": 1e-12,
+      "convergence_metric": "DIIS"
+    },
+    "log": {
+      "console": {
+        "level": "Performance"
+      }
+    },
+    "export": {
+      "export_gradient": true
+    }
+  },
+  "system": {
+    "max_gpu_memory_mb": 16000
+  },
+  "driver": "Gradient"
+}
