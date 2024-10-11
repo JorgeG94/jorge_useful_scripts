@@ -6,6 +6,26 @@ import argparse
 import numpy as np
 import subprocess
 
+import shutil
+
+def cleanup_directory(directory):
+    # Check if the directory exists
+    if os.path.exists(directory):
+        # Remove all files and directories within the directory
+        for filename in os.listdir(directory):
+            file_path = os.path.join(directory, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)  # Remove file or symbolic link
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)  # Remove directory
+            except Exception as e:
+                print(f"Failed to delete {file_path}. Reason: {e}")
+    else:
+        # If the directory does not exist, create it
+        os.makedirs(directory)
+
+
 bohr_radius = 0.52917721092
 atomic_masses = {
     "H": 1.00784,
@@ -70,6 +90,23 @@ def print_pretty_hessian(hessian):
     for row in hessian:
         print("  ".join(f"{val:10.6f}" for val in row))
 
+def center_of_mass(atoms, positions):
+    total_mass = 0
+    weighted_position_sum = [0.0, 0.0, 0.0]
+
+    for atom, position in zip(atoms, positions):
+        mass = atomic_masses.get(atom, 0)  # Look up atomic mass, 0 if not found
+        total_mass += mass
+        for i in range(3):
+            weighted_position_sum[i] += mass * position[i]
+
+    if total_mass == 0:
+        raise ValueError("Total mass cannot be zero!")
+
+    # Calculate the center of mass
+    center_of_mass = [coord / total_mass for coord in weighted_position_sum]
+    return center_of_mass
+
 # Function to read an XYZ file
 def read_xyz(xyz_file):
     with open(xyz_file, 'r') as f:
@@ -127,24 +164,25 @@ def generate_hessian_json(unperturbed_file, perturbed_geometries, output_file="h
         "model": {
             "method": "RestrictedHF",
             "basis": "STO-3G",
-            "aux_basis": "cc-pVDZ-RIFIT",
+            "aux_basis": "cc-pVTZ-RIFIT",
             "standard_orientation": "None"
         },
         "keywords": {
             "scf": {
                 "max_iters": 100,
+                "fock_build_type": "HGP",
                 "max_diis_history_length": 8,
                 "convergence_threshold": 1e-10,
                 "density_threshold": 1e-12,
                 "convergence_metric": "DIIS"
             },
-            "log": {"console": {"level": "Verbose"}},
+            "log": {"console": {"level": "Performance"}},
             "export": {
                 "export_gradient": True
             }
         },
         "system": {
-            "max_gpu_memory_mb": 2000
+            "max_gpu_memory_mb": 16000
         },
         "driver": "Gradient"
     }
@@ -236,7 +274,7 @@ def correlate_gradients_with_xyz(hdf5_file, json_file):
         topology_neg = f"topology_{i+1}"
 
         if topology_pos in gradients and topology_neg in gradients:
-            print(f"Correlating gradients for {pos_file} and {neg_file}")
+            #print(f"Correlating gradients for {pos_file} and {neg_file}")
             gradient_pairs.append((gradients[topology_pos], gradients[topology_neg]))
     return unperturbed_gradient, gradient_pairs
 
@@ -262,15 +300,124 @@ def build_hessian(grad_unp, gradient_pairs, delta):
         hessian[i, :] = second_derivative.flatten()
 
     return hessian
+def shift_to_center_of_mass(atoms, positions, center_of_mass):
+    shifted_positions = []
+    for position in positions:
+        shifted_position = [position[i] - center_of_mass[i] for i in range(3)]
+        shifted_positions.append(shifted_position)
+    return shifted_positions
+def calculate_inertia_tensor_programmatic(atoms, positions):
+    # Convert positions to a NumPy array for vectorized operations
+    positions = np.array(positions)
+    masses = np.array([atomic_masses.get(atom, 0) for atom in atoms])
+
+    # Extract x, y, z coordinates as separate arrays
+    x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
+
+    # Calculate diagonal elements (Ixx, Iyy, Izz)
+    Ixx = np.sum(masses * (y**2 + z**2))
+    Iyy = np.sum(masses * (x**2 + z**2))
+    Izz = np.sum(masses * (x**2 + y**2))
+
+    # Calculate off-diagonal elements (Ixy, Ixz, Iyz)
+    Ixy = -np.sum(masses * x * y)
+    Ixz = -np.sum(masses * x * z)
+    Iyz = -np.sum(masses * y * z)
+
+    # Construct the inertia tensor as a symmetric matrix
+    inertia_tensor = np.array([[Ixx, Ixy, Ixz],
+                               [Ixy, Iyy, Iyz],
+                               [Ixz, Iyz, Izz]])
+    
+    return inertia_tensor
+
+def calculate_eigenvalues_eigenvectors(inertia_tensor):
+    # Use NumPy to calculate eigenvalues and eigenvectors
+    eigenvalues, eigenvectors = np.linalg.eig(inertia_tensor)
+    return eigenvalues, eigenvectors
+
+def generate_D_vectors(atoms, positions):
+    N = len(atoms)  # Number of atoms
+    D1 = np.zeros(3 * N)
+    D2 = np.zeros(3 * N)
+    D3 = np.zeros(3 * N)
+
+    for i, atom in enumerate(atoms):
+        mass_sqrt = np.sqrt(atomic_masses.get(atom, 0))  # sqrt(mass)
+        # Assign values for each axis (x, y, z)
+        D1[3 * i] = mass_sqrt * positions[i][0]  # D1 corresponds to x axis
+        D2[3 * i + 1] = mass_sqrt * positions[i][1]  # D2 corresponds to y axis
+        D3[3 * i + 2] = mass_sqrt * positions[i][2]  # D3 corresponds to z axis
+
+    return D1, D2, D3
+
+def generate_rotational_D_vectors(atoms, positions, eigenvectors):
+    N = len(atoms)  # Number of atoms
+    D4 = np.zeros(3 * N)
+    D5 = np.zeros(3 * N)
+    D6 = np.zeros(3 * N)
+
+    for i, atom in enumerate(atoms):
+        mass_sqrt = np.sqrt(atomic_masses.get(atom, 0))  # sqrt(mass)
+        Px, Py, Pz = positions[i]  # Atom's position with respect to center of mass
+
+        # Extract the eigenvectors (X matrix)
+        X1, X2, X3 = eigenvectors[:, 0], eigenvectors[:, 1], eigenvectors[:, 2]
+
+        # Calculate D4, D5, and D6 for the i-th atom using the provided formulas
+        D4[3 * i]     = (Py * X3[0] - Pz * X2[0]) * mass_sqrt  # x component
+        D4[3 * i + 1] = (Py * X3[1] - Pz * X2[1]) * mass_sqrt  # y component
+        D4[3 * i + 2] = (Py * X3[2] - Pz * X2[2]) * mass_sqrt  # z component
+
+        D5[3 * i]     = (Pz * X1[0] - Px * X3[0]) * mass_sqrt  # x component
+        D5[3 * i + 1] = (Pz * X1[1] - Px * X3[1]) * mass_sqrt  # y component
+        D5[3 * i + 2] = (Pz * X1[2] - Px * X3[2]) * mass_sqrt  # z component
+
+        D6[3 * i]     = (Px * X2[0] - Py * X1[0]) * mass_sqrt  # x component
+        D6[3 * i + 1] = (Px * X2[1] - Py * X1[1]) * mass_sqrt  # y component
+        D6[3 * i + 2] = (Px * X2[2] - Py * X1[2]) * mass_sqrt  # z component
+
+    return D4, D5, D6
+
+def normalize_vector(vector):
+    norm = np.linalg.norm(vector)
+    if norm != 0:
+        return vector / norm
+    else:
+        return vector  # In case norm is zero, we return the original vector
+
+def normalize_D_vectors(D1, D2, D3, D4, D5, D6):
+    D1_normalized = normalize_vector(D1)
+    D2_normalized = normalize_vector(D2)
+    D3_normalized = normalize_vector(D3)
+    D4_normalized = normalize_vector(D4)
+    D5_normalized = normalize_vector(D5)
+    D6_normalized = normalize_vector(D6)
+
+    return D1_normalized, D2_normalized, D3_normalized, D4_normalized, D5_normalized, D6_normalized
+
+def remove_spurious_vectors(D_vectors, threshold=1e-6):
+    valid_D_vectors = []
+    for D in D_vectors:
+        dot_product = np.dot(D, D)  # Dot product of vector with itself
+        if dot_product > threshold:  # Keep the vector if it has a non-zero norm
+            valid_D_vectors.append(D)
+    return valid_D_vectors
 
 # Main function to prepare geometries for numerical Hessian
 def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", json_file="hessian_input.json", redo=True):
+    atoms, coordinates = read_xyz(xyz_file)
+    num_atoms = len(atoms)
+    coordinates_in_bohr = coordinates / bohr_radius
+    print(atoms)
+    com = center_of_mass(atoms, coordinates_in_bohr)
+    print("Center of Mass:", com)
     if redo:
-        atoms, coordinates = read_xyz(xyz_file)
-        num_atoms = len(atoms)
 
         # Number of expected geometries
         expected_geometries = 6 * num_atoms 
+
+        cleanup_directory(output_dir)
 
         # Generate perturbed geometries
         unperturbed_file, perturbed_geometries = generate_finite_difference_geometries(atoms, coordinates, delta, output_dir)
@@ -297,19 +444,52 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", json_file
 
     # Build the Hessian matrix
     hessian_matrix = build_hessian(unperturbed_gradient, gradient_pairs, delta)
-    print("\nHessian matrix:")
+    #print("\nHessian matrix:")
     # Bohr radius in Ångströms
 
     hessian_corrected = hessian_matrix * bohr_radius
-    print_pretty_hessian(hessian_corrected)
+    #print_pretty_hessian(hessian_corrected)
 
-    #atoms = ["O", "H", "H"]  # Example for a water molecule (O-H-H)
-    atoms = [ "C","C","C","C","C","C","H","H","H","H","H","H","H","H","H","H","H","H","H","H"]
-
-# Compute vibrational frequencies
+    # Compute vibrational frequencies
     vibrational_frequencies = compute_vibrational_frequencies(hessian_corrected, atoms)
     print("\nVibrational Frequencies (in cm^-1):\n", vibrational_frequencies)
+'''
+    shifted_positions = shift_to_center_of_mass(atoms, coordinates_in_bohr, com)
+    print("Shifted Positions:", shifted_positions)
 
+    inertia_tensor = calculate_inertia_tensor_programmatic(atoms, shifted_positions)
+    print("Inertia Tensor:\n", inertia_tensor)
+
+    # Get eigenvalues and eigenvectors of the inertia tensor
+    eigenvalues, eigenvectors = calculate_eigenvalues_eigenvectors(inertia_tensor)
+
+    print("Eigenvalues (Principal Moments of Inertia):", eigenvalues)
+    print("Eigenvectors (Principal Axes of Rotation):\n", eigenvectors)
+
+    D1, D2, D3 = generate_D_vectors(atoms, shifted_positions)
+    D4, D5, D6 = generate_rotational_D_vectors(atoms, shifted_positions, eigenvectors)
+
+    print("D1:", D1)
+    print("D2:", D2)
+    print("D3:", D3)
+    print("D4:", D4)
+    print("D5:", D5)
+    print("D6:", D6)
+
+    D1_norm, D2_norm, D3_norm, D4_norm, D5_norm, D6_norm = normalize_D_vectors(D1, D2, D3, D4, D5, D6)
+
+    print("Normalized D1:", D1_norm)
+    print("Normalized D2:", D2_norm)
+    print("Normalized D3:", D3_norm)
+    print("Normalized D4:", D4_norm)
+    print("Normalized D5:", D5_norm)
+    print("Normalized D6:", D6_norm)
+
+    D_vectors = [D1_norm, D2_norm, D3_norm, D4_norm, D5_norm, D6_norm]
+    valid_D_vectors = remove_spurious_vectors(D_vectors)
+
+    print("Valid D vectors:", valid_D_vectors, "number of vectors", len(valid_D_vectors))
+'''
 # Entry point for the script
 if __name__ == "__main__":
     # Use argparse for parsing command line arguments
