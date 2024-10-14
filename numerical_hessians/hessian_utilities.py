@@ -5,7 +5,7 @@ import h5py
 import argparse
 import numpy as np
 import subprocess
-
+from scipy.constants import c, pi
 import shutil
 
 bohr_radius = 0.52917721092
@@ -39,27 +39,7 @@ def mass_weight_hessian(hessian, atoms):
     mass_weighted_hessian = np.dot(mass_sqrt_inv_matrix, np.dot(hessian, mass_sqrt_inv_matrix))
 
     return mass_weighted_hessian
-# Function to compute vibrational frequencies from the Hessian
-def compute_vibrational_frequencies(hessian, atoms):
-    # Mass-weight the Hessian
-    mass_weighted_hessian = mass_weight_hessian(hessian, atoms)
-    #print("\nMass weighted Hessian ")
-    #print_pretty_hessian(mass_weighted_hessian)
 
-    # Diagonalize the mass-weighted Hessian to get eigenvalues
-    np.set_printoptions(precision=12)
-    #eigenvalues, _ = np.linalg.eigh(gms_mass_weight)
-    eigenvalues, _ = np.linalg.eig(mass_weighted_hessian)
-
-    # Remove small or negative eigenvalues (these correspond to translations/rotations)
-    positive_eigenvalues = eigenvalues[eigenvalues > 0]
-
-    # Convert eigenvalues to vibrational frequencies in cm^-1
-    # 1 atomic unit of frequency = 2.1947 * 10^5 cm^-1
-    conversion_factor = 2.642461e7
-    frequencies_cm1 = np.sqrt(abs(eigenvalues) * conversion_factor)
-
-    return frequencies_cm1
 
 def center_of_mass(atoms, positions):
     total_mass = 0
@@ -165,9 +145,9 @@ def calculate_inertia_tensor(atoms, positions):
     
     return inertia_tensor
 
-def calculate_eigenvalues_eigenvectors(inertia_tensor):
+def calculate_eigenvalues_eigenvectors(matrix):
     # Use NumPy to calculate eigenvalues and eigenvectors
-    eigenvalues, eigenvectors = np.linalg.eig(inertia_tensor)
+    eigenvalues, eigenvectors = np.linalg.eig(matrix)
     return eigenvalues, eigenvectors
 
 def generate_D_vectors(atoms, positions):
@@ -175,7 +155,6 @@ def generate_D_vectors(atoms, positions):
     D1 = np.zeros(3 * N)
     D2 = np.zeros(3 * N)
     D3 = np.zeros(3 * N)
-    print(positions)
     for i, atom in enumerate(atoms):
         mass_sqrt = np.sqrt(atomic_masses.get(atom, 0))  # sqrt(mass)
         # Assign values for each axis (x, y, z)
@@ -245,6 +224,18 @@ def generate_displacement_vectors(num_atoms):
         vector = np.random.rand(num_dof)  # Create a random vector of length 3N
         displacement_vectors.append(vector)
     return displacement_vectors
+def generate_small_displacement_vectors(num_atoms, displacement_magnitude=0.005):
+    num_dof = 3 * num_atoms  # Total degrees of freedom (3 per atom)
+    displacement_vectors = []
+    displacement_magnitude=0.005 * bohr_radius
+    for i in range(num_dof):
+        # Create a zero vector for each degree of freedom
+        vector = np.zeros(num_dof)
+        # Set the displacement in one degree of freedom (x, y, or z) to the specified magnitude
+        vector[i] = displacement_magnitude
+        displacement_vectors.append(vector)
+    
+    return displacement_vectors
 
 # Apply Gram-Schmidt to get 3N - X orthogonalized vectors
 def gram_schmidt_orthogonalization(vectors, reference_vectors):
@@ -269,3 +260,33 @@ def gram_schmidt_orthogonalization(vectors, reference_vectors):
             orthogonal_vectors.append(orthogonalized_v)
     
     return orthogonal_vectors
+
+def calculate_wavenumbers(eigenvalues):
+    conversion_factor = 2.642461e7 
+    wavenumbers = np.sqrt((np.abs(eigenvalues)*conversion_factor)) 
+    wavenumbers[eigenvalues < 0] *= -1  # Multiply by -1 for negative eigenvalues
+    return wavenumbers
+
+# Function to compute vibrational frequencies from the Hessian
+def compute_vibrational_frequencies(hessian, atoms):
+    # Mass-weight the Hessian
+    mass_weighted_hessian = mass_weight_hessian(hessian, atoms)
+    #print("\nMass weighted Hessian ")
+    #print_pretty_hessian(mass_weighted_hessian)
+
+    # Diagonalize the mass-weighted Hessian to get eigenvalues
+    np.set_printoptions(precision=12)
+    #eigenvalues, _ = np.linalg.eigh(gms_mass_weight)
+    eigenvalues, _ = np.linalg.eig(mass_weighted_hessian)
+    print("Eigenvalues", eigenvalues)
+
+    # Remove small or negative eigenvalues (these correspond to translations/rotations)
+    positive_eigenvalues = eigenvalues[eigenvalues > 0]
+
+    # Convert eigenvalues to vibrational frequencies in cm^-1
+    # 1 atomic unit of frequency = 2.1947 * 10^5 cm^-1
+    conversion_factor = 2.642461e7
+
+    frequencies_cm1 = np.sqrt(abs(eigenvalues) * conversion_factor)
+
+    return mass_weighted_hessian, frequencies_cm1

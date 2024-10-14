@@ -3,13 +3,15 @@ import sys
 import json
 import h5py
 import argparse
+from scipy.constants import c, pi
 import numpy as np
 import subprocess
 import shutil
-from input_output import read_xyz, print_pretty_hessian
+from input_output import read_xyz, print_pretty_hessian, print_pretty
 from hessian_utilities import center_of_mass, build_hessian, compute_vibrational_frequencies,shift_to_center_of_mass,\
 calculate_inertia_tensor, calculate_eigenvalues_eigenvectors, generate_D_vectors, generate_rotational_D_vectors,\
-normalize_D_vectors, remove_spurious_vectors,gram_schmidt_orthogonalization, generate_displacement_vectors
+normalize_D_vectors, remove_spurious_vectors,gram_schmidt_orthogonalization, generate_displacement_vectors, \
+calculate_wavenumbers, generate_small_displacement_vectors
 from utilities import correlate_gradients_with_xyz
 bohr_radius = 0.52917721092
 atomic_masses = {
@@ -75,11 +77,17 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
     # Bohr radius in Ångströms
 
     hessian_corrected = hessian_matrix * bohr_radius
-    print_pretty_hessian(hessian_corrected)
+
+    print_pretty(hessian_corrected)
 
     # Compute vibrational frequencies
-    vibrational_frequencies = compute_vibrational_frequencies(hessian_corrected, atoms)
-    print("\nVibrational Frequencies (in cm^-1):\n", vibrational_frequencies)
+    mass_weighted_hessian, vibrational_frequencies = compute_vibrational_frequencies(hessian_corrected, atoms)
+    print("\nVibrational Frequencies (in cm^-1):\n")
+    print_pretty(vibrational_frequencies)
+
+    if debug:
+        print("\n Mass weighted hessian : ")
+        print_pretty(mass_weighted_hessian)
 
     shifted_positions = shift_to_center_of_mass(atoms, coordinates_in_bohr, com)
     if debug:
@@ -98,7 +106,8 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
     D1, D2, D3 = generate_D_vectors(atoms, shifted_positions)
     D4, D5, D6 = generate_rotational_D_vectors(atoms, shifted_positions, eigenvectors)
     
-    if tmp_debug:
+    if debug:
+        print(" \n D vectors for transformations: ")
         print("D1:", D1)
         print("D2:", D2)
         print("D3:", D3)
@@ -110,23 +119,59 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
 
     valid_D_vectors = remove_spurious_vectors(D_vectors)
     if debug:
-        print("Valid D vectors:", valid_D_vectors, "number of vectors", len(valid_D_vectors))
+        print(f"\n There are {len(valid_D_vectors)} Valid D vectors: ")
+        for i, D_vec in enumerate(valid_D_vectors):
+            print(f" D{i+1} -> {D_vec}")
     
         # Normalize the remaining valid vectors
     normalized_D_vectors = normalize_D_vectors(valid_D_vectors)
+    
     if debug:
         for i, D_norm in enumerate(normalized_D_vectors):
             print(f"Normalized D{i+1}:", D_norm)
+    #print(normalized_D_vectors)
     
-    all_displacement_vectors = generate_displacement_vectors(N)
+    all_displacement_vectors = generate_small_displacement_vectors(N)
     X = len(valid_D_vectors)
     remaining_vectors = all_displacement_vectors[X:]
     
     # Apply Gram-Schmidt orthogonalization
+    #print(normalized_D_vectors)
     orthogonalized_D_vectors = gram_schmidt_orthogonalization(remaining_vectors,normalized_D_vectors)
+    if debug: 
+        print(" \n 3N - X vectors after GM orthogonalization: ")
+        for i, D_vec in enumerate(orthogonalized_D_vectors):
+            print(f"GM Ort D{i+1}:", D_vec)
 
-    for i, D_vec in enumerate(orthogonalized_D_vectors):
-        print(f"GM Ort D{i+1}:", D_vec)
+    
+    transformation_matrix_to_internal = np.array(orthogonalized_D_vectors)
+    if debug:
+        print("\n Transofmration matrix: ")
+        print_pretty(transformation_matrix_to_internal)
+
+    transposed_transformation_matrix = transformation_matrix_to_internal.T
+    mass_weighted_hessian_internal_coords = transformation_matrix_to_internal @ mass_weighted_hessian @ transposed_transformation_matrix
+    if debug:
+        print("\n Hessian in internal coordinates")
+        print_pretty(mass_weighted_hessian_internal_coords)
+    
+    #
+    eigenvalues_hess_internal, eigenvectors_hess_internal = calculate_eigenvalues_eigenvectors(mass_weighted_hessian_internal_coords)
+
+    if tmp_debug:
+        print("\n Eigenvalues in internal:")
+        np.set_printoptions(precision=18)
+        print(eigenvalues_hess_internal)
+        print("\n Eigenvectors in internal: ")
+        print_pretty(eigenvectors_hess_internal)
+    
+    wavenumbers = calculate_wavenumbers(eigenvalues)
+    
+    if tmp_debug:
+        print("\nWavenumbers:")
+        print_pretty(wavenumbers)
+
+    
 
 # Entry point for the script
 if __name__ == "__main__":

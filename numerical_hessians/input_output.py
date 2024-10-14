@@ -30,7 +30,26 @@ def print_pretty_hessian(hessian):
     np.set_printoptions(precision=6, suppress=True)  # Set precision and suppress scientific notation
     for row in hessian:
         print("  ".join(f"{val:10.6f}" for val in row))
-
+        
+def print_pretty(hessian_or_vector_or_scalar):
+    np.set_printoptions(precision=6, suppress=True)  # Set precision and suppress scientific notation
+    
+    # If the input is a scalar
+    if np.isscalar(hessian_or_vector_or_scalar):
+        print(f"{hessian_or_vector_or_scalar:10.6f}")
+    
+    # If the input is a 1D array (vector)
+    elif hessian_or_vector_or_scalar.ndim == 1:
+        print("  ".join(f"{val:10.12f}" for val in hessian_or_vector_or_scalar))
+    
+    # If the input is a 2D array (matrix)
+    elif hessian_or_vector_or_scalar.ndim == 2:
+        for row in hessian_or_vector_or_scalar:
+            print("  ".join(f"{val:10.12f}" for val in row))
+    
+    # If the input has more dimensions, print each sub-array recursively
+    else:
+        print(f"Unsupported dimension: {hessian_or_vector_or_scalar.ndim}")
 
 # Function to read an XYZ file
 def read_xyz(xyz_file):
