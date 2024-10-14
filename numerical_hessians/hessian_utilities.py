@@ -64,7 +64,12 @@ def generate_finite_difference_geometries(atoms, coordinates, delta, output_dir=
     perturbed_geometries = []
     num_atoms = len(atoms)
     num_coords = 3 * num_atoms
-
+    # Seminumerical hessians -> gradients and thee energy are analytic 
+    # atom x y z -> 3N coordinates, N = number of atoms 
+    # for each(coordinate):
+    # coord += delta
+    # coords -= delta
+    # 6N 
     # Ensure the output directory exists
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -88,28 +93,46 @@ def generate_finite_difference_geometries(atoms, coordinates, delta, output_dir=
 
     return unperturbed_file, perturbed_geometries
 
+def print_pretty_for_cpp(vector):
+    """
+    Function to print the elements of a vector in C++ format {value, value, value}.
+    Handles both 1D and 2D numpy arrays.
+    """
+    # Flatten the vector if it's a multi-dimensional array
+    if isinstance(vector, np.ndarray) and vector.ndim > 1:
+        vector = vector.flatten()
 
-
+    # Iterate over the elements of the vector and format each element
+    formatted_vector = ', '.join(f'{val:.16e}' for val in vector)
+    print(f'{{ {formatted_vector} }},')
 
 # Function to build the correct 9x9 Hessian matrix from gradient pairs
 def build_hessian(grad_unp, gradient_pairs, delta):
-    num_coords = len(gradient_pairs)  # Number of coordinates (half the size of gradient_pairs)
+    num_coords = len(gradient_pairs)  # Number of coordinates 
     num_atoms = int(num_coords / 3)  # Each atom has 3 coordinates (x, y, z)
     
     # Initialize a 9x9 Hessian matrix
     hessian = np.zeros((num_coords, num_coords))
 
+
     # Iterate over each displacement to fill the Hessian
+    print(f" delta = {delta}")
     for i in range(num_coords):
+        #print(gradient_pairs[i])
+        # print_pretty_for_cpp(gradient_pairs[i][0])
+        # print_pretty_for_cpp(gradient_pairs[i][1])
         # Access the positive and negative gradient for this coordinate displacement
         grad_pos = np.array(gradient_pairs[i][0])  # Positive displacement
         grad_neg = np.array(gradient_pairs[i][1])  # Negative displacement
 
         # Compute the second derivative using finite differences
+        
         second_derivative = (grad_pos - grad_neg ) / ( 2* delta)
 
         # Place this second derivative in the appropriate row of the Hessian
         # We want the i-th row of the Hessian, and the full row is determined by the flattened gradient
+        #print("\n second der = ", second_derivative.flatten())
+        print_pretty_for_cpp(second_derivative.flatten())
         hessian[i, :] = second_derivative.flatten()
 
     return hessian

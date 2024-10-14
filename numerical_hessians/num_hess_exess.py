@@ -72,22 +72,34 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
     unperturbed_gradient, gradient_pairs = correlate_gradients_with_xyz(hdf5_file, json_file)
 
     # Build the Hessian matrix
+    
+    delta = delta / bohr_radius # this turns it to bohrs
     hessian_matrix = build_hessian(unperturbed_gradient, gradient_pairs, delta)
     print("\nHessian matrix:")
     # Bohr radius in Ångströms
 
-    hessian_corrected = hessian_matrix * bohr_radius
+    hessian_corrected = hessian_matrix #* bohr_radius #* bohr_radius
 
     print_pretty(hessian_corrected)
 
     # Compute vibrational frequencies
     mass_weighted_hessian, vibrational_frequencies = compute_vibrational_frequencies(hessian_corrected, atoms)
-    print("\nVibrational Frequencies (in cm^-1):\n")
+    print("\n Frequencies (in cm^-1):\n")
     print_pretty(vibrational_frequencies)
 
     if debug:
         print("\n Mass weighted hessian : ")
         print_pretty(mass_weighted_hessian)
+    
+    # 3N - X vibrational modes 
+    # X = 0, atom
+    # X = 5 if molecule is linear 
+    # X = 6 for anything else 
+
+    # Molecules -> rotation, translations, vibrations 
+    # Vibrations 3N-X
+    # rotations and translations 
+
 
     shifted_positions = shift_to_center_of_mass(atoms, coordinates_in_bohr, com)
     if debug:
@@ -106,7 +118,7 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
     D1, D2, D3 = generate_D_vectors(atoms, shifted_positions)
     D4, D5, D6 = generate_rotational_D_vectors(atoms, shifted_positions, eigenvectors)
     
-    if debug:
+    if tmp_debug:
         print(" \n D vectors for transformations: ")
         print("D1:", D1)
         print("D2:", D2)
@@ -118,13 +130,15 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
     D_vectors = [D1, D2, D3, D4, D5, D6]
 
     valid_D_vectors = remove_spurious_vectors(D_vectors)
-    if debug:
+    if tmp_debug:
         print(f"\n There are {len(valid_D_vectors)} Valid D vectors: ")
         for i, D_vec in enumerate(valid_D_vectors):
             print(f" D{i+1} -> {D_vec}")
     
         # Normalize the remaining valid vectors
     normalized_D_vectors = normalize_D_vectors(valid_D_vectors)
+
+    # HC=CH is C2n -> linear therefore, assert(is_linear, yes/no) ! 
     
     if debug:
         for i, D_norm in enumerate(normalized_D_vectors):
@@ -188,5 +202,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Call the function with the parsed arguments
+    # this is angstroms 
     delta = 0.005 * bohr_radius
     prepare_hessian_geometries(args.input, delta, redo=args.redo, debug=args.debug)
