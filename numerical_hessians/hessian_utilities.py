@@ -4,6 +4,7 @@ import json
 import h5py
 import argparse
 import numpy as np
+from input_output import *
 import subprocess
 from scipy.constants import c, pi
 import shutil
@@ -114,9 +115,28 @@ def build_hessian(grad_unp, gradient_pairs, delta):
     # Initialize a 9x9 Hessian matrix
     hessian = np.zeros((num_coords, num_coords))
 
-
     # Iterate over each displacement to fill the Hessian
-    print(f" delta = {delta}")
+    print(f"delta is {delta}")
+    for i in range(num_coords):
+        grad_pos = np.array(gradient_pairs[i][0])  # Positive displacement
+        grad_neg = np.array(gradient_pairs[i][1])  # Negative displacement
+    
+        # Compute the second derivative using finite differences
+        second_derivative = (grad_pos - grad_neg) / (2 * delta)
+    
+        # Flatten the second derivative
+        flat_second_derivative = second_derivative.flatten()
+    
+        # Assign values to ensure symmetry in the Hessian
+        for j in range(len(flat_second_derivative)):
+            hessian[i, j] = flat_second_derivative[j]
+            hessian[j, i] = flat_second_derivative[j]  # Symmetric assignment
+    
+    return hessian
+
+
+'''
+    # Iterate over each displacement to fill the Hessian
     for i in range(num_coords):
         #print(gradient_pairs[i])
         # print_pretty_for_cpp(gradient_pairs[i][0])
@@ -131,12 +151,11 @@ def build_hessian(grad_unp, gradient_pairs, delta):
 
         # Place this second derivative in the appropriate row of the Hessian
         # We want the i-th row of the Hessian, and the full row is determined by the flattened gradient
-        #print("\n second der = ", second_derivative.flatten())
-        print_pretty_for_cpp(second_derivative.flatten())
+        print("\n second der = ", second_derivative.flatten())
         hessian[i, :] = second_derivative.flatten()
 
     return hessian
-
+'''
 def shift_to_center_of_mass(atoms, positions, center_of_mass):
     shifted_positions = []
     for position in positions:
@@ -170,7 +189,7 @@ def calculate_inertia_tensor(atoms, positions):
 
 def calculate_eigenvalues_eigenvectors(matrix):
     # Use NumPy to calculate eigenvalues and eigenvectors
-    eigenvalues, eigenvectors = np.linalg.eig(matrix)
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
     return eigenvalues, eigenvectors
 
 def generate_D_vectors(atoms, positions):
@@ -283,6 +302,12 @@ def gram_schmidt_orthogonalization(vectors, reference_vectors):
             orthogonal_vectors.append(orthogonalized_v)
     
     return orthogonal_vectors
+def print_matrix_curly_braces(matrix):
+    # Convert each row to the desired format
+    formatted_rows = ["{" + ", ".join(f"{value:.19f}" for value in row) + "}" for row in matrix]
+    # Join all rows with newline characters and wrap with curly braces for the entire matrix
+    formatted_matrix = "{" + ",\n ".join(formatted_rows) + "}"
+    print(formatted_matrix)
 
 def calculate_wavenumbers(eigenvalues):
     conversion_factor = 2.642461e7 
@@ -294,22 +319,25 @@ def calculate_wavenumbers(eigenvalues):
 def compute_vibrational_frequencies(hessian, atoms):
     # Mass-weight the Hessian
     mass_weighted_hessian = mass_weight_hessian(hessian, atoms)
-    #print("\nMass weighted Hessian ")
-    #print_pretty_hessian(mass_weighted_hessian)
+    print("\nMass weighted Hessian ")
+    print(np.array2string(mass_weighted_hessian, separator=', ', precision=6, suppress_small=False))
+    #print(mass_weighted_hessian)
 
     # Diagonalize the mass-weighted Hessian to get eigenvalues
     np.set_printoptions(precision=12)
     #eigenvalues, _ = np.linalg.eigh(gms_mass_weight)
     eigenvalues, _ = np.linalg.eig(mass_weighted_hessian)
-    print("Eigenvalues", eigenvalues)
+    real_eigenvalues = np.real(eigenvalues)
+    print("\nEigenvalues")
+    print_pretty(real_eigenvalues)
 
     # Remove small or negative eigenvalues (these correspond to translations/rotations)
-    positive_eigenvalues = eigenvalues[eigenvalues > 0]
+    positive_eigenvalues = eigenvalues[real_eigenvalues > 0]
 
     # Convert eigenvalues to vibrational frequencies in cm^-1
     # 1 atomic unit of frequency = 2.1947 * 10^5 cm^-1
     conversion_factor = 2.642461e7
 
-    frequencies_cm1 = np.sqrt(abs(eigenvalues) * conversion_factor)
+    frequencies_cm1 = np.sqrt(abs(real_eigenvalues) * conversion_factor)
 
     return mass_weighted_hessian, frequencies_cm1
