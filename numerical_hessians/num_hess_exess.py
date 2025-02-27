@@ -7,12 +7,12 @@ from scipy.constants import c, pi
 import numpy as np
 import subprocess
 import shutil
-from input_output import read_xyz, print_pretty_hessian, print_pretty
+from input_output import read_xyz, print_pretty_hessian, print_pretty, cleanup_directory, write_xyz, generate_hessian_json
 from hessian_utilities import center_of_mass, build_hessian, compute_vibrational_frequencies,shift_to_center_of_mass,\
 calculate_inertia_tensor, calculate_eigenvalues_eigenvectors, generate_D_vectors, generate_rotational_D_vectors,\
 normalize_D_vectors, remove_spurious_vectors,gram_schmidt_orthogonalization, generate_displacement_vectors, \
-calculate_wavenumbers, generate_small_displacement_vectors
-from utilities import correlate_gradients_with_xyz
+calculate_wavenumbers, generate_small_displacement_vectors, generate_finite_difference_geometries
+from utilities import correlate_gradients_with_xyz, run_shell_command
 bohr_radius = 0.52917721092
 atomic_masses = {
     "H": 1.00784,
