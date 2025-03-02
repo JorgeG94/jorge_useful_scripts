@@ -192,49 +192,52 @@ def calculate_eigenvalues_eigenvectors(matrix):
     eigenvalues, eigenvectors = np.linalg.eigh(matrix)
     return eigenvalues, eigenvectors
 
-def generate_D_vectors(atoms, positions):
-    N = len(atoms)  # Number of atoms
-    D1 = np.zeros(3 * N)
-    D2 = np.zeros(3 * N)
-    D3 = np.zeros(3 * N)
-    for i, atom in enumerate(atoms):
-        mass_sqrt = np.sqrt(atomic_masses.get(atom, 0))  # sqrt(mass)
-        # Assign values for each axis (x, y, z)
-        D1[3 * i] = mass_sqrt * positions[i][0]  # D1 corresponds to x axis
-        D2[3 * i + 1] = mass_sqrt * positions[i][1]  # D2 corresponds to y axis
-        D3[3 * i + 2] = mass_sqrt * positions[i][2]  # D3 corresponds to z axis
+def generate_translational_rotational_D_vectors(atoms, positions):
 
-    return D1, D2, D3
+    m = np.array([atomic_masses[atom] for atom in atoms])
+    print(f"m shape: {m.shape}")
+    z = np.zeros_like(m)
+    i = np.ones_like(m)
+    ux = np.ravel([i, z, z], order='F')
+    uy = np.ravel([z, i, z], order='F')
+    uz = np.ravel([z, z, i], order='F')
 
-def generate_rotational_D_vectors(atoms, positions, eigenvectors):
-    N = len(atoms)  # Number of atoms
-    D4 = np.zeros(3 * N)
-    D5 = np.zeros(3 * N)
-    D6 = np.zeros(3 * N)
+    geom = np.array(positions)
+    xxx = np.repeat(geom[:, 0], 3)
+    yyy = np.repeat(geom[:, 1], 3)
+    zzz = np.repeat(geom[:, 2], 3)
 
-    for i, atom in enumerate(atoms):
-        mass_sqrt = np.sqrt(atomic_masses.get(atom, 0)) 
-        # Calculate dot products: Px, Py, Pz
-        Px = np.dot(positions[i], eigenvectors[:, 0])  # Dot product with the first eigenvector (X1)
-        Py = np.dot(positions[i], eigenvectors[:, 1])  # Dot product with the second eigenvector (X2)
-        Pz = np.dot(positions[i], eigenvectors[:, 2])  # Dot product with the third eigenvector (X3)
+    sqrtmmm = np.repeat(np.sqrt(m), 3)
+    R4 = sqrtmmm * (yyy * uz - zzz * uy)
+    R5 = sqrtmmm * (zzz * ux - xxx * uz)
+    R6 = sqrtmmm * (xxx * uy - yyy * ux)
 
-        # Extract the eigenvectors (X matrix)
-        X1, X2, X3 = eigenvectors[:, 0], eigenvectors[:, 1], eigenvectors[:, 2]
+    
+    T1 = sqrtmmm * ux
+    T2 = sqrtmmm * uy
+    T3 = sqrtmmm * uz
 
-        # Calculate D4, D5, and D6 for the i-th atom using the provided formulas
-        D4[3 * i]     = (Py * X3[0] - Pz * X2[0]) * mass_sqrt  # x component
-        D4[3 * i + 1] = (Py * X3[1] - Pz * X2[1]) * mass_sqrt  # y component
-        D4[3 * i + 2] = (Py * X3[2] - Pz * X2[2]) * mass_sqrt  # z component
+    print(f"T1: {T1}\n")
+    print(f"T2: {T2}\n")
+    print(f"T3: {T3}\n")
 
-        D5[3 * i]     = (Pz * X1[0] - Px * X3[0]) * mass_sqrt  # x component
-        D5[3 * i + 1] = (Pz * X1[1] - Px * X3[1]) * mass_sqrt  # y component
-        D5[3 * i + 2] = (Pz * X1[2] - Px * X3[2]) * mass_sqrt  # z component
+    return T1, T2, T3, R4, R5, R6
 
-        D6[3 * i]     = (Px * X2[0] - Py * X1[0]) * mass_sqrt  # x component
-        D6[3 * i + 1] = (Px * X2[1] - Py * X1[1]) * mass_sqrt  # y component
-        D6[3 * i + 2] = (Px * X2[2] - Py * X1[2]) * mass_sqrt  # z component
-    return D4, D5, D6
+def orthogonalise_matrix(matrix, tol=1e-6):
+    u, s, _ = np.linalg.svd(matrix, full_matrices=False)
+    M, N = matrix.shape
+    eps = np.finfo(float).eps
+    if tol is None:
+        tol = max(M, N) * np.amax(s) * eps
+    num = np.sum(s > tol, dtype=int)
+    Q = u[:, :num]
+    return Q.T
+
+def projection_matrix(matrix, N):
+    P = np.identity(3 * N)
+    for irt in matrix:
+        P -= np.outer(irt, irt)
+    return P
 
 # Function to normalize vectors using the reciprocal square root of the scalar product
 def normalize_vector(vector):
@@ -266,6 +269,7 @@ def generate_displacement_vectors(num_atoms):
         vector = np.random.rand(num_dof)  # Create a random vector of length 3N
         displacement_vectors.append(vector)
     return displacement_vectors
+
 def generate_small_displacement_vectors(num_atoms, displacement_magnitude=0.005):
     num_dof = 3 * num_atoms  # Total degrees of freedom (3 per atom)
     displacement_vectors = []
@@ -279,29 +283,6 @@ def generate_small_displacement_vectors(num_atoms, displacement_magnitude=0.005)
     
     return displacement_vectors
 
-# Apply Gram-Schmidt to get 3N - X orthogonalized vectors
-def gram_schmidt_orthogonalization(vectors, reference_vectors):
-    orthogonal_vectors = []
-    
-    for v in vectors:
-        # Start with the current vector
-        orthogonalized_v = np.copy(v)
-        
-        # Subtract projections onto reference vectors (translational and rotational)
-        for ref in reference_vectors:
-            projection = np.dot(orthogonalized_v, ref) / np.dot(ref, ref) * ref
-            orthogonalized_v -= projection
-        
-        # Subtract projections onto previously orthogonalized vectors
-        for u in orthogonal_vectors:
-            projection = np.dot(orthogonalized_v, u) / np.dot(u, u) * u
-            orthogonalized_v -= projection
-        
-        # Add the orthogonalized vector to the list if it is non-zero
-        if np.linalg.norm(orthogonalized_v) > 1e-6:  # Avoid near-zero vectors
-            orthogonal_vectors.append(orthogonalized_v)
-    
-    return orthogonal_vectors
 def print_matrix_curly_braces(matrix):
     # Convert each row to the desired format
     formatted_rows = ["{" + ", ".join(f"{value:.19f}" for value in row) + "}" for row in matrix]
@@ -341,3 +322,17 @@ def compute_vibrational_frequencies(hessian, atoms):
     frequencies_cm1 = np.sqrt(abs(real_eigenvalues) * conversion_factor)
 
     return mass_weighted_hessian, frequencies_cm1
+
+def compute_vibrational_frequencies_internal(internal_hessian):
+    eigenvalues, _ = np.linalg.eig(internal_hessian)
+    real_eigenvalues = np.real(eigenvalues)
+    print("\nEigenvalues from Internal Hessian")
+    print_pretty(real_eigenvalues)
+
+    # Convert eigenvalues to vibrational frequencies in cm^-1
+    # 1 atomic unit of frequency = 2.1947 * 10^5 cm^-1
+    conversion_factor = 2.642461e7
+
+    frequencies_cm1 = np.sqrt(abs(real_eigenvalues) * conversion_factor)
+
+    return frequencies_cm1

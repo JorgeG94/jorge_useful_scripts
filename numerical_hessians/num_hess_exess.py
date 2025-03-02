@@ -9,9 +9,10 @@ import subprocess
 import shutil
 from input_output import read_xyz, print_pretty_hessian, print_pretty, cleanup_directory, write_xyz, generate_hessian_json
 from hessian_utilities import center_of_mass, build_hessian, compute_vibrational_frequencies,shift_to_center_of_mass,\
-calculate_inertia_tensor, calculate_eigenvalues_eigenvectors, generate_D_vectors, generate_rotational_D_vectors,\
-normalize_D_vectors, remove_spurious_vectors,gram_schmidt_orthogonalization, generate_displacement_vectors, \
-calculate_wavenumbers, generate_small_displacement_vectors, generate_finite_difference_geometries
+calculate_inertia_tensor, calculate_eigenvalues_eigenvectors, generate_translational_rotational_D_vectors,\
+normalize_D_vectors, remove_spurious_vectors, orthogonalise_matrix, projection_matrix, \
+calculate_wavenumbers, generate_small_displacement_vectors, generate_finite_difference_geometries, \
+compute_vibrational_frequencies_internal
 from utilities import correlate_gradients_with_xyz, run_shell_command
 bohr_radius = 0.52917721092
 atomic_masses = {
@@ -90,17 +91,6 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
     if debug:
         print("\n Mass weighted hessian : ")
         print_pretty(mass_weighted_hessian)
-
-    eigenvalues_mwh, eigenvectors_mwh = calculate_eigenvalues_eigenvectors(mass_weighted_hessian)
-    threshold = 1e-2
-    #   Identify indices of the eigenvalues greater than the threshold
-    valid_indices = np.abs(eigenvalues_mwh) > threshold
-    valid_indices_array = np.where(valid_indices)[0]
-    #print(valid_indices_array)
-
-# Filter the vibrational eigenvectors based on these valid indices
-    vibrational_eigenvectors = eigenvectors_mwh[valid_indices_array,:]
-    #print(f"the eigenvectors are {vibrational_eigenvectors}")
     
     # 3N - X vibrational modes 
     # X = 0, atom
@@ -126,11 +116,7 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
         print("Eigenvalues (Principal Moments of Inertia):", eigenvalues)
         print("Eigenvectors (Principal Axes of Rotation):\n", eigenvectors)
 
-    
-    #print(f"the eigenvectors are: {vibrational_eigenvectors}")
-
-    D1, D2, D3 = generate_D_vectors(atoms, shifted_positions)
-    D4, D5, D6 = generate_rotational_D_vectors(atoms, shifted_positions, eigenvectors)
+    D1, D2, D3, D4, D5, D6 = generate_translational_rotational_D_vectors(atoms, shifted_positions)
     
     if debug:
         print(" \n D vectors for transformations: ")
@@ -143,81 +129,19 @@ def prepare_hessian_geometries(xyz_file, delta, output_dir="num_hess", redo=True
 
     D_vectors = [D1, D2, D3, D4, D5, D6]
 
-    valid_D_vectors = remove_spurious_vectors(D_vectors)
+    trans_rot_space = np.vstack(D_vectors)
+    trans_rot_space_orth = orthogonalise_matrix(trans_rot_space.T)
+    projection = projection_matrix(trans_rot_space_orth, N)
+
+
+    mwhess_proj = np.dot(projection.T, mass_weighted_hessian).dot(projection)
+
+    internal_hessian = mwhess_proj
+
+    vibrational_frequencies_internal = compute_vibrational_frequencies_internal(internal_hessian)
     if debug:
-        print(f"\n There are {len(valid_D_vectors)} Valid D vectors: ")
-        for i, D_vec in enumerate(valid_D_vectors):
-            print(f" D{i+1} -> {D_vec}")
-    
-        # Normalize the remaining valid vectors
-    eckart_D_vectors = normalize_D_vectors(valid_D_vectors)
-
-    # HC=CH is C2n -> linear therefore, assert(is_linear, yes/no) ! 
-    
-    if tmp_debug:
-        for i, D_norm in enumerate(eckart_D_vectors):
-            print(f"Normalized D{i+1}:", D_norm)
-    # Initialize a 3N x 3N matrix with zeros
-    transformed_vectors = np.zeros((3*N, 3*N))
-
-# Fill the matrix with the respective x, y, z values at the correct positions
-    for i, (x, y, z) in enumerate(shifted_positions):
-        transformed_vectors[3*i, 3*i] = x
-        transformed_vectors[3*i+1, 3*i+1] = y
-        transformed_vectors[3*i+2, 3*i+2] = z
-
-# Print the transformed matrix
-    #print("AAAAAAAAAAAAAAAAAAA")
-    #print(len(transformed_vectors))
-    
-    all_displacement_vectors = generate_small_displacement_vectors(N)
-    X = len(valid_D_vectors)
-    remaining_vectors = all_displacement_vectors[X:]
-    #remaining_vectors = transformed_vectors[X:]
-    print(f"The len of remaining is {len(remaining_vectors)} and the len of eigv is {len(vibrational_eigenvectors)}")
-    
-    # Apply Gram-Schmidt orthogonalization
-    U, s, V = np.linalg.svd(eckart_D_vectors, full_matrices=True)
-
-    print(U[:,2:])
-    print(len(s))
-    
-    # orthogonalized_D_vectors = gram_schmidt_orthogonalization(vibrational_eigenvectors, eckart_D_vectors)
-    # if tmp_debug: 
-    #     print(" \n 3N - X vectors after GM orthogonalization: ")
-    #     for i, D_vec in enumerate(orthogonalized_D_vectors):
-    #         print(f"GM Ort D{i+1}:", D_vec)
-
-    
-    # transformation_matrix_to_internal = np.array(orthogonalized_D_vectors)
-    # transposed_transformation_matrix = transformation_matrix_to_internal.T
-    # if tmp_debug:
-    #     print("\n Transofmration matrix: ")
-    #     print_pretty(transposed_transformation_matrix)
-
-    
-    # mass_weighted_hessian_internal_coords = transformation_matrix_to_internal @ mass_weighted_hessian @ transposed_transformation_matrix
-    # if debug:
-    #     print("\n Hessian in internal coordinates")
-    #     print_pretty(mass_weighted_hessian_internal_coords)
-    
-    # #
-    # eigenvalues_hess_internal, eigenvectors_hess_internal = calculate_eigenvalues_eigenvectors(mass_weighted_hessian_internal_coords)
-
-    # if tmp_debug:
-    #     print("\n Eigenvalues in internal:")
-    #     np.set_printoptions(precision=18)
-    #     print(eigenvalues_hess_internal)
-    #     print("\n Eigenvectors in internal: ")
-    #     print_pretty(eigenvectors_hess_internal)
-    
-    # wavenumbers = calculate_wavenumbers(eigenvalues)
-    
-    # if tmp_debug:
-    #     print("\nWavenumbers:")
-    #     print_pretty(wavenumbers)
-
-    
+        print("\n Frequencies (in cm^-1):\n")
+        print_pretty(vibrational_frequencies_internal)
 
 # Entry point for the script
 if __name__ == "__main__":
