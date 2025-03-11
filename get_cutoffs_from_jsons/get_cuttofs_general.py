@@ -26,12 +26,12 @@ def analyze_and_plot_nmers(file_path):
     dimer_deltaEs_print = {}
     dimer_distances_print = {}
     conversion_to_kj=2625.5
-    small = 1e-6
+    small = 1e-5
     less_small=9e-1
     # Process monomers
     for monomer in monomers:
         id = monomer["fragments"][0]
-        total_energy = monomer["hf_energy"]
+        total_energy = monomer["hf_energy"] + monomer["mp2_os_correction"] + monomer["mp2_ss_correction"]
         monomer_energies[id] = total_energy
 
     # Process dimers, only including those containing the reference fragment
@@ -40,14 +40,14 @@ def analyze_and_plot_nmers(file_path):
     for dimer in dimers:
         fragments = tuple(sorted(dimer["fragments"]))
         fragments = tuple(sorted(dimer["fragments"]))
-        E_IJ = dimer["hf_energy"]
+        E_IJ = dimer["hf_energy"] + dimer["mp2_os_correction"] + dimer["mp2_ss_correction"]
         E_I = monomer_energies.get(fragments[0], 0)
         E_J = monomer_energies.get(fragments[1], 0)
         deltaE_IJ = E_IJ - (E_I + E_J)
         dimer_deltaEs[fragments] = deltaE_IJ
         dimer_distances[fragments] = dimer["fragment_distance"]
         if reference_fragment in fragments:
-            E_IJ = dimer["hf_energy"]
+            E_IJ = dimer["hf_energy"] + dimer["mp2_os_correction"] + dimer["mp2_ss_correction"]
             E_I = monomer_energies.get(fragments[0], 0)
             E_J = monomer_energies.get(fragments[1], 0)
             deltaE_IJ = E_IJ - (E_I + E_J)
@@ -76,7 +76,7 @@ def analyze_and_plot_nmers(file_path):
         for trimer in trimers:
             fragments = tuple(sorted(trimer["fragments"]))
             if reference_fragment in fragments:
-                E_IJK = trimer["hf_energy"]
+                E_IJK = trimer["hf_energy"] + trimer["mp2_os_correction"] + trimer["mp2_ss_correction"]
                 deltaE_components = []
                 distances = []
                 for i in range(3):
@@ -105,8 +105,8 @@ def analyze_and_plot_nmers(file_path):
 
     # Finalize plotting
     #plt.title(f'Log Scale Abs(Avg \u0394E) vs. Distance for Nmers Containing Fragment {reference_fragment}')
-    plt.ylim(-1, 1)
-    #plt.xlim(7.5,20)
+    plt.ylim(-0.5, 0.5)
+    #plt.xlim(0,180)
     plt.xlabel('Distance')
     plt.ylabel('\u0394E (kJ/mol)')
     plt.legend()
