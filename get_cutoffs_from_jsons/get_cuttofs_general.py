@@ -66,7 +66,7 @@ def analyze_and_plot_nmers(file_path):
     plt.axhline(y=0.1, color='black', linestyle='--', label='y=0.1')
     plt.axhline(y=-0.1, color='black', linestyle='--', label='y=-0.1')
     dimer_distances_plot = [dimer_distances[fragments] for fragments in dimer_deltaEs_print]
-    dimer_abs_deltaEs_plot = [(small - dimer_deltaEs_print[fragments])*conversion_to_kj for fragments in dimer_deltaEs_print]
+    dimer_abs_deltaEs_plot = [(dimer_deltaEs_print[fragments])*conversion_to_kj for fragments in dimer_deltaEs_print]
     plt.scatter(dimer_distances_plot, dimer_abs_deltaEs_plot, color='blue', label='Dimers')
 
     # Check if trimers exist and process them, only including those containing the reference fragment
