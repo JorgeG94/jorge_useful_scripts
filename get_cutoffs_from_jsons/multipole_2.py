@@ -151,10 +151,10 @@ def protein_fragment_dipoles(protein_fragments, protein_atom_charges, coordinate
             dipole += (iatom_charge * coordinate)
             r_vector += (coordinate)
             fragment_charge += iatom_charge
-        if fragment_charge == 0.0:
-            r_vector = np.array([0.0, 0.0, 0.0])
-        else:
-            r_vector = (1.0 / len(fragment)) * r_vector
+        # if fragment_charge == 0.0:
+        #     r_vector = np.array([0.0, 0.0, 0.0])
+        # else:
+        r_vector = (1.0 / len(fragment)) * r_vector
         protein_dipole_info[ifrag] = [dipole, r_vector]
     return protein_dipole_info
 
