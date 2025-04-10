@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import re
 import os
+import sys
 
 valid_symbols = {
     "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
@@ -48,14 +49,10 @@ def read_pdb(pdb_file):
             
             complex_geometry = []
             complex_symbols = []
-            protein_geometry = []
-            protein_symbols = []
-            ligand_geometry = []
-            ligand_symbols = []
             continue
         elif line.startswith("TER") and start:
             start = False
-            yield {"symbols": complex_symbols, "geometry": complex_geometry}, {"symbols": protein_symbols, "geometry": protein_geometry}, {"symbols": ligand_symbols, "geometry": ligand_geometry}
+            yield {"symbols": complex_symbols, "geometry": complex_geometry}
             continue
         elif start and line.startswith("ATOM"):
             line_split = line.split()
@@ -92,78 +89,40 @@ def read_pdb(pdb_file):
                 elif symbol in ligand_nitrogen_atoms:
                     symbol = "N"
 
-
-
-                ligand_symbols.append(symbol)
-                ligand_geometry.extend([x, y, z])
             else:
                 symbol = line_split[-1].rstrip("\n")
-                protein_symbols.append(symbol)
-                protein_geometry.extend([x, y, z])
             
             if symbol not in valid_symbols:
                 # print(f"{symbol} is not a valid symbol.\nProblematic line: {line}", file=open("mdpdb2qdxf_error.dat", "a"))
                 raise SystemExit(f"{symbol} is not a valid symbol.\nProblematic line: {line}")
 
             complex_symbols.append(symbol)
-            complex_geometry.extend([x, y, z])
+            complex_geometry.append([x, y, z])
+
+def print_json_to_xyz(topo, frame, name):
+    symbols = topo["symbols"]
+    geometry = topo["geometry"]
+
+    natoms = len(symbols)
+    xyz_string = f"{natoms}\n\n"
+    for i, symbol in enumerate(symbols):
+        coordinate = geometry[i]
+        x = coordinate[0]
+        y = coordinate[1]
+        z = coordinate[2]
+        xyz_string += f"{symbol:<4}{x:<10.3f}{y:<10.3f}{z:<10.3f}"
+        if i != natoms - 1:
+            xyz_string += "\n"
+
+    with open(f"{name}_{frame}.xyz", "w") as f:
+        f.write(xyz_string)
 
 if __name__ == "__main__":
     wd = Path(os.getcwd())
-    md_path = wd / "md"
-    ligands = [item for item in md_path.iterdir() if item.is_dir()]
+    pdb_file = sys.argv[1]
+    name = pdb_file.split(".pdb")[0]
 
-    for ligand in ligands:
-        ligand_name = str(ligand.stem)
-        ligand_path = wd / "md" / ligand_name
-        protein_topo_file = ligand_path / f"topol.{ligand_name}.top"
-        ligand_topo_file = ligand_path / f"{ligand_name}_GMX.itp"
-
-        protein_charges = read_topology(protein_topo_file)
-        ligand_charges = read_topology(ligand_topo_file)
-
-        complex_charges = protein_charges + ligand_charges
-
-        for i in range(2, 4):
-            output_complex_topo_models = []
-            output_protein_topo_models = []
-            output_ligand_topo_models = []
-
-            output_dir = wd / "pbsa" / ligand_name / f"{i}"
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            repeat_path = ligand_path / f"{i}"
-            pdb_file = repeat_path / f"md.{ligand_name}.cluster.pdb"
-
-            complex_output_path = output_dir / "complex.qdx.json"
-            protein_output_path = output_dir / "protein.qdx.json"
-            ligand_output_path = output_dir / "ligand.qdx.json"
-
-            if complex_output_path.is_file() and protein_output_path.is_file() and ligand_output_path.is_file():
-                continue
-
-            for complex_topo, protein_topo, ligand_topo in read_pdb(pdb_file):
-                complex_topo["partial_charges"] = complex_charges
-                protein_topo["partial_charges"] = protein_charges
-                ligand_topo["partial_charges"] = ligand_charges
-
-                output_complex_topo_models.append({"topology": complex_topo})
-                output_protein_topo_models.append({"topology": protein_topo})
-                output_ligand_topo_models.append({"topology": ligand_topo})
-                        
-            with open(output_dir / "complex.qdx.json", "w") as f:
-                json.dump(output_complex_topo_models, f, indent=4)
-
-            with open(output_dir / "protein.qdx.json", "w") as f:
-                json.dump(output_protein_topo_models, f, indent=4)
-
-            with open(output_dir / "ligand.qdx.json", "w") as f:
-                json.dump(output_ligand_topo_models, f, indent=4)
-
-            
-            
-
-
-
-
-
+    frame = 0
+    for complex_topo in read_pdb(pdb_file):
+        print_json_to_xyz(complex_topo, frame, name)
+        frame += 1
